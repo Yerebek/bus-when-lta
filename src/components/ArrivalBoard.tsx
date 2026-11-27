@@ -45,10 +45,21 @@ interface ArrivalBoardProps {
 type ServiceFilterMode = 'all' | 'pinned' | 'wab';
 
 const ArrivalSlotCell: React.FC<{
-  slot: NextBusSlot;
+  slot?: NextBusSlot;
   nowMs: number;
   isPrimary?: boolean;
 }> = ({ slot, nowMs, isPrimary = false }) => {
+  if (!slot || !slot.EstimatedArrival) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="font-mono text-base font-medium tabular-nums text-slate-400">
+          —
+        </span>
+        <span className="text-[11px] text-slate-400">No schedule</span>
+      </div>
+    );
+  }
+
   const minutes = getMinutesUntil(slot.EstimatedArrival, nowMs);
   const label = formatArrivalLabel(minutes);
   const clock = formatClockTime(slot.EstimatedArrival);
@@ -303,7 +314,10 @@ export const ArrivalBoard: React.FC<ArrivalBoardProps> = ({
           </div>
 
           <div className="text-xs text-slate-500 font-mono tabular-nums">
-            Updated {lastUpdatedText} · Simulated LTA DataMall Feed
+            Updated {lastUpdatedText} ·{' '}
+            {arrivals?.source === 'live'
+              ? 'Live LTA DataMall v3'
+              : 'Simulated Preview (set LTA_ACCOUNT_KEY for live v3)'}
           </div>
         </div>
       </div>

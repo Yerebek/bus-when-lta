@@ -9,7 +9,7 @@ import { useFavorites } from './hooks/useFavorites';
 import { fetchBusArrivals, getBusStopByCode } from './services/busApi';
 import { BusArrivalResponse } from './types/bus';
 
-const AUTO_REFRESH_INTERVAL_SEC = 30;
+const AUTO_REFRESH_INTERVAL_SEC = 20;
 
 export default function App() {
   const [activeView, setActiveView] = useState<AppView>('arrivals');
@@ -231,7 +231,7 @@ export default function App() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <span>
-            SG BusTiming · Frontend preview using simulated Singapore LTA DataMall arrival timings
+            SG BusTiming · Connected to /api/busarrival (LTA DataMall v3 with simulated fallback when key is unset)
           </span>
           <button
             type="button"

@@ -30,6 +30,15 @@ export interface BusArrivalResponse {
   BusStopCode: string;
   Services: BusServiceArrival[];
   fetchedAt: number;
+  source?: 'live' | 'simulated';
+}
+
+export interface ApiHealthStatus {
+  status: 'ok';
+  service: string;
+  ltaConfigured: boolean;
+  endpointVersion: string;
+  timestamp: string;
 }
 
 export type SingaporeRegion = 'Central' | 'East' | 'West' | 'North' | 'North-East';

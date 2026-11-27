@@ -51,6 +51,16 @@ export const SINGAPORE_BUS_STOPS: BusStop[] = [
     Services: ['2', '7', '12', '32', '33', '51', '61', '63', '80', '130', '133', '145', '175', '197'],
   },
   {
+    BusStopCode: '04121',
+    RoadName: 'Eu Tong Sen St',
+    Description: 'Clarke Quay Stn Exit E',
+    Latitude: 1.2886,
+    Longitude: 103.8465,
+    Region: 'Central',
+    NearbyMRT: 'NE5 Clarke Quay',
+    Services: ['2', '12', '33', '51', '54', '61', '63', '80', '124', '145', '147', '166', '174', '190', '197'],
+  },
+  {
     BusStopCode: '03211',
     RoadName: 'Bayfront Ave',
     Description: 'Marina Bay Sands Theatre',

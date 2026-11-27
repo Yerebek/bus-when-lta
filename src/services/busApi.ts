@@ -3,43 +3,67 @@ import {
   getEstimatedRouteSummary,
   SINGAPORE_BUS_STOPS,
 } from '../data/singaporeBusData';
-import { BusArrivalResponse, BusRouteSummary, BusStop } from '../types/bus';
+import { ApiHealthStatus, BusArrivalResponse, BusRouteSummary, BusStop } from '../types/bus';
 
-/**
- * Frontend API Adapter Layer
- * --------------------------
- * Currently uses simulated LTA DataMall v2 responses so the frontend works standalone.
- * To connect your real LTA DataMall backend proxy later:
- *   1. Set USE_LIVE_API = true
- *   2. Point API_BASE_URL to your proxy route (e.g., '/api/lta')
- *      which attaches your server-side LTA AccountKey header.
- */
-export const BUS_API_CONFIG = {
-  USE_LIVE_API: false,
-  API_BASE_URL: '/api/lta',
-};
+export async function fetchApiHealth(): Promise<ApiHealthStatus | null> {
+  try {
+    const res = await fetch('/api/health');
+    if (!res.ok) return null;
+    return (await res.json()) as ApiHealthStatus;
+  } catch {
+    return null;
+  }
+}
 
-export async function fetchBusArrivals(busStopCode: string): Promise<BusArrivalResponse> {
+export async function fetchBusArrivals(
+  busStopCode: string,
+  serviceNo?: string
+): Promise<BusArrivalResponse> {
   const cleanCode = busStopCode.trim();
-
-  if (BUS_API_CONFIG.USE_LIVE_API) {
-    const res = await fetch(
-      `${BUS_API_CONFIG.API_BASE_URL}/bus-arrival?BusStopCode=${encodeURIComponent(cleanCode)}`
-    );
-    if (!res.ok) {
-      throw new Error(`Failed to fetch arrivals for stop ${cleanCode} (${res.status})`);
-    }
-    const payload = await res.json();
-    return {
-      BusStopCode: payload.BusStopCode ?? cleanCode,
-      Services: payload.Services ?? [],
-      fetchedAt: Date.now(),
-    };
+  const params = new URLSearchParams({ BusStopCode: cleanCode });
+  if (serviceNo && serviceNo.trim()) {
+    params.set('ServiceNo', serviceNo.trim());
   }
 
-  // Subtle realistic network latency (90-180ms) for smooth UI transitions
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  return generateSimulatedArrivals(cleanCode);
+  try {
+    const res = await fetch(`/api/busarrival?${params.toString()}`);
+
+    if (res.ok) {
+      const payload = await res.json();
+      return {
+        BusStopCode: payload.BusStopCode ?? cleanCode,
+        Services: Array.isArray(payload.Services) ? payload.Services : [],
+        fetchedAt: Date.now(),
+        source: 'live',
+      };
+    }
+
+    const errorPayload = await res.json().catch(() => ({}));
+
+    // When LTA_ACCOUNT_KEY is not yet configured on the server, gracefully fall back
+    // to simulated arrival timings so the frontend remains functional in preview.
+    if (res.status === 503 && errorPayload?.code === 'MISSING_API_KEY') {
+      const simulated = generateSimulatedArrivals(cleanCode);
+      return {
+        ...simulated,
+        source: 'simulated',
+      };
+    }
+
+    throw new Error(
+      errorPayload?.error || `Failed to fetch arrivals for stop ${cleanCode} (${res.status})`
+    );
+  } catch (err) {
+    if (err instanceof TypeError) {
+      // Network/offline fallback
+      const simulated = generateSimulatedArrivals(cleanCode);
+      return {
+        ...simulated,
+        source: 'simulated',
+      };
+    }
+    throw err;
+  }
 }
 
 export function getBusStopByCode(busStopCode: string): BusStop | undefined {

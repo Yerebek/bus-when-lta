@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { fetchApiHealth } from '../services/busApi';
+import { ApiHealthStatus } from '../types/bus';
 
 interface ApiSchemaModalProps {
   isOpen: boolean;
@@ -7,13 +9,28 @@ interface ApiSchemaModalProps {
 }
 
 export const ApiSchemaModal: React.FC<ApiSchemaModalProps> = ({ isOpen, onClose }) => {
+  const [health, setHealth] = useState<ApiHealthStatus | null>(null);
+  const [checking, setChecking] = useState(false);
+
   useEffect(() => {
     if (!isOpen) return;
+    let active = true;
+    setChecking(true);
+    fetchApiHealth().then((res) => {
+      if (active) {
+        setHealth(res);
+        setChecking(false);
+      }
+    });
+
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
+    return () => {
+      active = false;
+      window.removeEventListener('keydown', handleEsc);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -33,10 +50,11 @@ export const ApiSchemaModal: React.FC<ApiSchemaModalProps> = ({ isOpen, onClose 
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
             <h2 id="api-modal-title" className="font-display text-lg font-bold text-slate-900">
-              LTA DataMall API Adapter Guide
+              LTA DataMall v3 Serverless Connection
             </h2>
             <p className="text-xs text-slate-500">
-              Frontend data structures match Singapore LTA DataMall Bus Arrival v2/v3 responses.
+              Connected to <code className="font-mono">/api/health.ts</code> and{' '}
+              <code className="font-mono">/api/busarrival.ts</code> at project root.
             </p>
           </div>
           <button
@@ -50,50 +68,53 @@ export const ApiSchemaModal: React.FC<ApiSchemaModalProps> = ({ isOpen, onClose 
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5 space-y-5 text-sm text-slate-600">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs">
+            <div className="font-semibold text-slate-900">Serverless Endpoint Status</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-slate-600">
+              <span>
+                /api/health:{' '}
+                {checking ? 'Checking...' : health?.status === 'ok' ? 'Reachable' : 'Unavailable'}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                LTA_ACCOUNT_KEY:{' '}
+                {checking
+                  ? 'Checking...'
+                  : health?.ltaConfigured
+                  ? 'Configured (Live v3 active)'
+                  : 'Not set (using simulated fallback)'}
+              </span>
+            </div>
+          </div>
+
           <div>
             <h3 className="font-display text-sm font-semibold text-slate-900">
-              1. Switch the Frontend Adapter
+              1. Configure Your Key Safely
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              Open <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">src/services/busApi.ts</code> and set{' '}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">USE_LIVE_API: true</code> once your backend proxy route is ready.
+              Add <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">LTA_ACCOUNT_KEY</code> in your AI Studio Secrets panel or server <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">.env</code> file. It is read exclusively on the server inside <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-800">/api/busarrival.ts</code> and never sent to the browser.
             </p>
           </div>
 
           <div>
             <h3 className="font-display text-sm font-semibold text-slate-900">
-              2. Example Server Proxy Route
+              2. Serverless Endpoints
             </h3>
-            <p className="mt-1 text-xs text-slate-600">
-              Keep your LTA <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-slate-800">AccountKey</code> strictly on the backend:
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
-{`app.get('/api/lta/bus-arrival', async (req, res) => {
-  const code = String(req.query.BusStopCode || '');
-  const response = await fetch(
-    \`https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival?BusStopCode=\${encodeURIComponent(code)}\`,
-    { headers: { AccountKey: process.env.LTA_ACCOUNT_KEY! } }
-  );
-  res.json(await response.json());
-});`}
-            </pre>
-          </div>
-
-          <div>
-            <h3 className="font-display text-sm font-semibold text-slate-900">
-              3. Expected Field Mapping
-            </h3>
-            <ul className="mt-2 space-y-1.5 text-xs text-slate-600">
-              <li>
-                <span className="font-mono font-semibold text-slate-800">Load:</span> SEA (Seats Available), SDA (Standing Available), LSD (Limited Standing)
-              </li>
-              <li>
-                <span className="font-mono font-semibold text-slate-800">Type:</span> SD (Single Deck), DD (Double Deck), BD (Bendy)
-              </li>
-              <li>
-                <span className="font-mono font-semibold text-slate-800">Feature:</span> WAB (Wheelchair Accessible Bus)
-              </li>
+            <ul className="mt-2 space-y-1.5 text-xs text-slate-600 font-mono">
+              <li>GET /api/health → server &amp; key configuration status</li>
+              <li>GET /api/busarrival?BusStopCode=04121 → all services at stop (v3, 20s refresh)</li>
+              <li>GET /api/busarrival?BusStopCode=04121&amp;ServiceNo=7 → single service lookup</li>
             </ul>
+          </div>
+
+          <div>
+            <h3 className="font-display text-sm font-semibold text-slate-900">
+              3. Upstream LTA DataMall Endpoint
+            </h3>
+            <pre className="mt-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100">
+{`GET https://datamall2.mytransport.sg/ltaodataservice/v3/BusArrival?BusStopCode=04121
+Header: AccountKey: <process.env.LTA_ACCOUNT_KEY>`}
+            </pre>
           </div>
         </div>
 
